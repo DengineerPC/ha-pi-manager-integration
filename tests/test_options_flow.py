@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from homeassistant import config_entries
 from homeassistant.helpers import config_validation as cv
 from probatio import to_field_list
 from probatio.error import Invalid
@@ -13,7 +14,11 @@ from custom_components.pi_manager.const import (
     CONF_NETWORK_INCLUDE,
     DEFAULT_OPTIONS,
 )
-from custom_components.pi_manager.options_flow import _options_schema
+from custom_components.pi_manager.options_flow import PiManagerOptionsFlow, _options_schema
+
+
+def test_options_flow_uses_explicit_reload_listener_compatible_base() -> None:
+    assert not issubclass(PiManagerOptionsFlow, config_entries.OptionsFlowWithReload)
 
 
 def test_options_schema_accepts_minimum_safe_polling_interval() -> None:

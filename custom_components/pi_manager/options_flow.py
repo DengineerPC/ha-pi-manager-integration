@@ -27,7 +27,7 @@ from .errors import PiManagerError, ServiceNameError
 from .validation import validate_service_list
 
 
-class PiManagerOptionsFlow(config_entries.OptionsFlowWithReload):
+class PiManagerOptionsFlow(config_entries.OptionsFlow):
     """Edit behaviour without changing a host's identity or key."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> config_entries.ConfigFlowResult:

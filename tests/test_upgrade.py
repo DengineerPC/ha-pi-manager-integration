@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from custom_components.pi_manager.const import HELPER_VERSION
 from custom_components.pi_manager.contract import parse_status
 from custom_components.pi_manager.models import KeyMaterial
 from custom_components.pi_manager.upgrade import async_upgrade_if_needed
@@ -44,10 +45,10 @@ class FakeRuntime:
 async def test_older_helper_is_upgraded_once() -> None:
     payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
     old = parse_status({**payload, "agent_version": "0.0.1"})
-    new = parse_status({**payload, "agent_version": "0.2.3"})
+    new = parse_status({**payload, "agent_version": HELPER_VERSION})
     runtime = FakeRuntime(new)
     result = await async_upgrade_if_needed(runtime, old)
-    assert result.agent_version == "0.2.3"
+    assert result.agent_version == HELPER_VERSION
     assert runtime.helper_upgrade_attempted is True
     assert runtime.commands[0][0:3] == ["upgrade-helper", "--json", "--version"]
     assert "--signature" in runtime.commands[0]
