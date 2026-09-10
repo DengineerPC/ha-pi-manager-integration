@@ -10,6 +10,24 @@ on:
 permissions: {}
 
 jobs:
+  remote-helper-compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Compile remote helper sources
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          remote_dir = Path("custom_components/pi_manager/remote")
+          for filename in ("pi_manager_agent.py", "pi-managerctl"):
+              path = remote_dir / filename
+              compile(path.read_text(encoding="utf-8"), path.as_posix(), "exec")
+              print(f"Python 3.13 compile PASS: {path}")
+
   test:
     runs-on: ubuntu-latest
     steps:

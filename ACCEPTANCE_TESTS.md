@@ -24,6 +24,7 @@ The labels are intentional:
 | Helper | Filesystem/network filters, schema output, fixed optional Tailscale probe, service validation, update serialization | `tests/test_remote_agent.py` | PASS |
 | Maintenance | Fixed per-host package previews, audit/holds/failed-service queries, serialized background package jobs, root-only worker, and rejection of extra package arguments | `tests/test_remote_agent.py`, `tests/test_contract.py`, `tests/test_actions.py` | PASS |
 | Upgrade | Signed, per-host helper upgrade is attempted once and preserves identity | `tests/test_upgrade.py` | PASS |
+| Remote helper compatibility | Shipped agent and suffixless control wrapper have Python 3.13-compatible source; helper marker matches the shared version | `tests/test_remote_helper_compatibility.py`, integration CI Python 3.13 job | PASS |
 | Diagnostics | Password, key material and fingerprint are redacted | `tests/test_diagnostics.py` | PASS |
 | Multi-host | Keys and refresh actions remain entry-local | `tests/test_multi_host.py` | PASS |
 
@@ -61,7 +62,8 @@ version, host OS/architecture, and result before changing `NOT RUN` to
 | M-12 | Install the dashboard resource, open the Community dashboards picker, select Pi Manager, and confirm Overview plus one view per host. Add/remove a host and regenerate; confirm views change without editing Lovelace storage/YAML. | NOT RUN |
 | M-13 | Download diagnostics for a configured host; inspect the export and confirm it contains no password, private key, raw `authorized_keys`, environment, or unbounded apt output. | NOT RUN |
 | M-14 | Complete authenticated setup on a physical Raspberry Pi 1 reporting `armv6l`; confirm the host is accepted and receives an independent device. On a managed host with Tailscale installed, confirm `tailscaled.service` state and `tailscale0` traffic entities appear without any Tailscale credentials or control actions. | NOT RUN |
+| M-17 | On each supported Python 3.13 host, trigger the signed helper upgrade; confirm helper `0.2.4`, schema `1`, unchanged machine ID/fingerprint, valid status JSON, and cleared helper-contract repair. Do not use an unsigned/manual replacement. | NOT RUN |
 
 The current source/package state is therefore suitable for focused automated
 review, but it is not a claim of authenticated hardware, HACS, deployment, or
-production acceptance until M-01 through M-13 are executed.
+production acceptance until the applicable manual checks are executed.

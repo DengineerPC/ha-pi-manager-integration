@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ha-pi-manager-integration"
-version = "0.2.4"
+version = "0.2.5"
 description = "Secure SSH-based Raspberry Pi and Debian host management for Home Assistant"
 requires-python = ">=3.14.2"
 dependencies = ["asyncssh>=2.20.0"]

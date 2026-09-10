@@ -34,7 +34,7 @@ except ImportError:  # pragma: no cover - only used on non-POSIX development hos
     _fcntl = None
 
 SCHEMA_VERSION = 1
-AGENT_VERSION = "0.2.3"
+AGENT_VERSION = "0.2.4"
 CONFIG_PATH = Path("/etc/pi-manager/config.json")
 TRUST_PATH = Path("/etc/pi-manager/trust.json")
 STATE_PATH = Path("/var/lib/pi-manager/state.json")
@@ -128,10 +128,15 @@ def _emit(payload: Mapping[str, Any], *, returncode: int = 0) -> int:
 
 
 def _read_json(path: Path, default: Mapping[str, Any]) -> dict[str, Any]:
+    # This source is formatted with the HA runtime target (Python 3.14), but
+    # is executed on managed hosts with Python 3.13. Preserve the portable
+    # exception spelling below.
+    # fmt: off
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError, OSError, json.JSONDecodeError:
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
         return dict(default)
+    # fmt: on
     return dict(data) if isinstance(data, dict) else dict(default)
 
 
@@ -282,10 +287,12 @@ def _temperature() -> float | None:
     candidates = sorted(Path("/sys/class/thermal").glob("thermal_zone*/temp"))
     candidates.extend(sorted(Path("/sys/class/hwmon").glob("hwmon*/temp*_input")))
     for candidate in candidates:
+        # fmt: off
         try:
             value = float(candidate.read_text(encoding="utf-8").strip())
-        except OSError, ValueError:
+        except (OSError, ValueError):
             continue
+        # fmt: on
         if value > 200:
             value /= 1000
         if -50 <= value <= 150:

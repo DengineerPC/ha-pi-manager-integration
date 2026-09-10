@@ -1,6 +1,6 @@
 # Pi Manager Installation
 
-This guide covers the public `0.2.4` HACS Integration release for Home
+This guide covers the public `0.2.5` HACS Integration release for Home
 Assistant `2026.5.0` or newer.
 
 ## Prerequisites
@@ -10,7 +10,9 @@ Assistant `2026.5.0` or newer.
 - SSH enabled on the host.
 - A host account with password SSH access for the one-time bootstrap.
 - Temporary password-authenticated sudo for that account during bootstrap.
-- Python 3, systemd, sudo, apt/dpkg, and a writable target filesystem.
+- Python 3.13 or newer, systemd, sudo, apt/dpkg, and a writable target
+  filesystem. The bundled remote helper is compiled for Python 3.13-compatible
+  syntax before it is accepted by the host.
 - A current Home Assistant backup before installing a custom integration.
 
 Pi Manager communicates over outbound SSH from Home Assistant. It does not
@@ -94,6 +96,10 @@ paths; never delete the entire `authorized_keys` file.
   repair/reconfigure path. Do not silently replace the trusted key.
 - **Missing Python/systemd/apt/sudo:** install the supported host prerequisites
   and retry. Pi Manager does not fall back to broad sudo or a shell.
+- **Helper contract needs attention:** keep the host reachable and let the
+  signed per-host helper upgrade retry. Do not replace the helper manually or
+  delete the config entry; the repair clears only after a schema-valid status
+  response from the corrected helper is confirmed.
 - **Architecture unsupported:** Raspberry Pi 1 normally reports `armv6l` and
   is accepted when the supported OS prerequisites are present.
 
