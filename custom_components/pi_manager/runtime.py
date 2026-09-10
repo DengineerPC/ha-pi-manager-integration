@@ -107,7 +107,7 @@ class PiManagerRuntime:
         now = asyncio.get_running_loop().time()
         try:
             cadence = max(900, int(self.options.get(CONF_PACKAGE_CHECK_CADENCE, 6 * 60 * 60)))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             cadence = 6 * 60 * 60
         if self.package_check_attempted_at is not None and now - self.package_check_attempted_at < cadence:
             return None

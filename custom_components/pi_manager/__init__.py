@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -37,7 +38,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     refresh_task = hass.async_create_task(coordinator.async_refresh(), name=f"pi_manager_refresh_{entry.entry_id}")
-    entry.async_on_unload(refresh_task.cancel)
+    entry.async_on_unload(lambda: _cancel_task(refresh_task))
     return True
 
 
@@ -63,3 +64,9 @@ def _key_store(hass: HomeAssistant) -> Any:
     from .key_store import KeyStore
 
     return KeyStore(hass.config.config_dir)
+
+
+def _cancel_task(task: asyncio.Task[Any]) -> None:
+    """Cancel a task through the zero-argument ConfigEntry unload callback API."""
+
+    task.cancel()

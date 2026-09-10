@@ -30,9 +30,6 @@ from .validation import validate_service_list
 class PiManagerOptionsFlow(config_entries.OptionsFlowWithReload):
     """Edit behaviour without changing a host's identity or key."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self.config_entry = config_entry
-
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> config_entries.ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -51,7 +48,7 @@ class PiManagerOptionsFlow(config_entries.OptionsFlowWithReload):
                 errors["base"] = str(err)
             except PiManagerError:
                 errors["base"] = "service_unavailable"
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 errors["base"] = "invalid_options"
         schema = _options_schema({**DEFAULT_OPTIONS, **self.config_entry.options})
         return self.async_show_form(step_id="init", data_schema=schema, errors=errors)

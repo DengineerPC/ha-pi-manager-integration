@@ -172,11 +172,11 @@ class PiManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ig
     @staticmethod
     @callback
     def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
+        _config_entry: config_entries.ConfigEntry,
     ) -> config_entries.OptionsFlow:
         from .options_flow import PiManagerOptionsFlow
 
-        return PiManagerOptionsFlow(config_entry)
+        return PiManagerOptionsFlow()
 
     def _duplicate_machine(self, machine_id: str) -> bool:
         return any(

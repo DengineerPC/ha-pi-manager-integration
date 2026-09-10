@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ha-pi-manager-integration"
-version = "0.2.0"
+version = "0.2.1"
 description = "Secure SSH-based Raspberry Pi and Debian host management for Home Assistant"
-requires-python = ">=3.13"
+requires-python = ">=3.14.2"
 dependencies = ["asyncssh>=2.20.0"]
 
 [project.optional-dependencies]
@@ -24,13 +24,13 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.14"
 ignore_missing_imports = true
 follow_imports = "skip"
 check_untyped_defs = true

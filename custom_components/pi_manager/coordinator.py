@@ -102,7 +102,7 @@ def _create_fingerprint_issue(hass: Any, entry_id: str) -> None:
             translation_key="fingerprint_changed",
             translation_placeholders={"entry_id": entry_id},
         )
-    except (ImportError, AttributeError):
+    except ImportError, AttributeError:
         _LOGGER.debug("Repair issue API unavailable while reporting fingerprint mismatch")
 
 
@@ -119,5 +119,5 @@ def _create_helper_issue(hass: Any, entry_id: str) -> None:
             translation_key="helper_incompatible",
             translation_placeholders={"entry_id": entry_id},
         )
-    except (ImportError, AttributeError):
+    except ImportError, AttributeError:
         _LOGGER.debug("Repair issue API unavailable while reporting helper mismatch")

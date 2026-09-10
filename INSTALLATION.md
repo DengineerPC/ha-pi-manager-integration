@@ -1,6 +1,6 @@
 # Pi Manager Installation
 
-This guide covers the public `0.2.0` HACS Integration release for Home
+This guide covers the public `0.2.1` HACS Integration release for Home
 Assistant `2026.5.0` or newer.
 
 ## Prerequisites

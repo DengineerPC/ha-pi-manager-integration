@@ -188,6 +188,6 @@ def as_number(value: Any, *, default: float | None = None) -> float | None:
         return default
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
     return number if number == number and abs(number) != float("inf") else default

@@ -93,7 +93,7 @@ class Bootstrapper:
                     raise BootstrapError("machine_identity", "The final helper identity changed during bootstrap")
             finally:
                 await final_client.close()
-        except (BootstrapError, HostFingerprintMismatch):
+        except BootstrapError, HostFingerprintMismatch:
             raise
         except Exception as err:
             raise BootstrapError("deployment", "Pi Manager bootstrap did not complete") from err

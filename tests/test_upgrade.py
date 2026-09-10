@@ -44,10 +44,10 @@ class FakeRuntime:
 async def test_older_helper_is_upgraded_once() -> None:
     payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
     old = parse_status({**payload, "agent_version": "0.0.1"})
-    new = parse_status({**payload, "agent_version": "0.2.0"})
+    new = parse_status({**payload, "agent_version": "0.2.1"})
     runtime = FakeRuntime(new)
     result = await async_upgrade_if_needed(runtime, old)
-    assert result.agent_version == "0.2.0"
+    assert result.agent_version == "0.2.1"
     assert runtime.helper_upgrade_attempted is True
     assert runtime.commands[0][0:3] == ["upgrade-helper", "--json", "--version"]
     assert "--signature" in runtime.commands[0]
