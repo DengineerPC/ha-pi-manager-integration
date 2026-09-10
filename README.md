@@ -10,6 +10,8 @@ This is the public HACS Integration repository:
 Pi Manager targets Home Assistant `2026.5.0` or newer. It has no YAML setup
 requirement and does not require the optional dashboard package.
 
+[Open Pi Manager Integration in HACS](https://my.home-assistant.io/redirect/hacs_repository/?owner=DengineerPC&repository=ha-pi-manager-integration&category=integration)
+
 ## Install through HACS
 
 Until the repository is included in HACS's default catalog, add it as a custom

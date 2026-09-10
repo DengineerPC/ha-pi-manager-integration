@@ -6,7 +6,7 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import selector
 
 from .const import (
     CONF_ENABLE_DANGEROUS_CONTROLS,
@@ -55,7 +55,7 @@ class PiManagerOptionsFlow(config_entries.OptionsFlowWithReload):
 
 
 def _options_schema(current: dict[str, Any]) -> vol.Schema:
-    string_list = vol.All(cv.ensure_list, [cv.string])
+    string_list = selector.TextSelector(selector.TextSelectorConfig(multiple=True))
     return vol.Schema(
         {
             vol.Required(CONF_POLL_INTERVAL, default=current[CONF_POLL_INTERVAL]): vol.All(
