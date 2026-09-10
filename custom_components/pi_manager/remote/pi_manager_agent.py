@@ -34,7 +34,7 @@ except ImportError:  # pragma: no cover - only used on non-POSIX development hos
     _fcntl = None
 
 SCHEMA_VERSION = 1
-AGENT_VERSION = "0.2.1"
+AGENT_VERSION = "0.2.2"
 CONFIG_PATH = Path("/etc/pi-manager/config.json")
 TRUST_PATH = Path("/etc/pi-manager/trust.json")
 STATE_PATH = Path("/var/lib/pi-manager/state.json")

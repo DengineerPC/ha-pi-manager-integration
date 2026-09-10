@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 DOMAIN = "pi_manager"
-INTEGRATION_VERSION = "0.2.1"
+INTEGRATION_VERSION = "0.2.2"
 SCHEMA_VERSION = 1
 MIN_POLL_INTERVAL = 15
 DEFAULT_POLL_INTERVAL = 30
