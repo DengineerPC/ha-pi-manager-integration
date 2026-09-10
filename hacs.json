@@ -1,0 +1,8 @@
+{
+  "name": "Pi Manager Integration",
+  "content_in_root": false,
+  "zip_release": true,
+  "filename": "ha-pi-manager-integration.zip",
+  "render_readme": true,
+  "homeassistant": "2026.5.0"
+}

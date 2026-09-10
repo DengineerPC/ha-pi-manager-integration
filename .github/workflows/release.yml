@@ -1,0 +1,70 @@
+name: Integration Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[test]"
+      - name: Test
+        run: python -m pytest tests -q
+      - name: Format check
+        run: ruff format --check custom_components tests
+      - name: Lint
+        run: ruff check custom_components tests
+      - name: Type check
+        run: mypy custom_components
+      - name: Compile
+        run: python -m compileall -q custom_components
+      - name: Verify release version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python - "$RELEASE_TAG" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          tag_version = sys.argv[1].removeprefix("v")
+          manifest = json.loads(pathlib.Path("custom_components/pi_manager/manifest.json").read_text())
+          if manifest["version"] != tag_version:
+              raise SystemExit(f"tag {tag_version} does not match manifest {manifest['version']}")
+          print(f"release version PASS: {tag_version}")
+          PY
+      - name: Build HACS ZIP asset
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+
+          with zipfile.ZipFile("ha-pi-manager-integration.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+              for path in sorted(Path("custom_components").rglob("*")):
+                  if path.is_file():
+                      archive.write(path, path.as_posix())
+          PY
+          sha256sum ha-pi-manager-integration.zip > SHA256SUMS.txt
+          unzip -tq ha-pi-manager-integration.zip
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" ha-pi-manager-integration.zip SHA256SUMS.txt --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" ha-pi-manager-integration.zip SHA256SUMS.txt \
+              --verify-tag \
+              --title "Pi Manager Integration $GITHUB_REF_NAME" \
+              --generate-notes
+          fi

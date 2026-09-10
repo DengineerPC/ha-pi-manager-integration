@@ -1,0 +1,14 @@
+#!/usr/bin/python3
+"""Restricted executable entry point for Pi Manager operations."""
+
+from __future__ import annotations
+
+import sys
+
+sys.path.insert(0, "/usr/local/lib/pi-manager")
+
+from pi_manager_agent import main  # noqa: E402
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

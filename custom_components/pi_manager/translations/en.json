@@ -1,0 +1,91 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect a Pi or Debian host",
+        "description": "Enter the SSH connection details. The password is used only for secure bootstrap and is not retained after key setup.",
+        "data": {
+          "host": "Host or IP address",
+          "port": "SSH port",
+          "username": "SSH username",
+          "password": "Bootstrap password",
+          "display_name": "Display name"
+        }
+      },
+      "confirm": {
+        "title": "Review and trust host",
+        "description": "Detected {hostname} ({os}, {architecture}, machine ID {machine_id}). SSH fingerprint: {fingerprint}. Sudo is {sudo}. Pi Manager will {helper} the root-owned helper and restricted sudo policy.",
+        "data": {
+          "confirm": "Install Pi Manager support"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to the host over SSH.",
+      "host_invalid": "Enter a valid hostname or IP address.",
+      "port_invalid": "Enter a valid SSH port between 1 and 65535.",
+      "username_invalid": "Enter a safe Linux username.",
+      "wrong_password": "SSH authentication failed. Check the username and bootstrap password.",
+      "fingerprint_changed": "The SSH host fingerprint changed. Review the host and explicitly reconfigure trust.",
+      "unsupported_os": "The host is not a supported Debian/Raspberry Pi OS system.",
+      "unsupported_architecture": "The host architecture is not supported.",
+      "missing_python": "Python 3 was not found on the host.",
+      "missing_systemd": "systemd was not found on the host.",
+      "missing_apt": "apt-get was not found on the host.",
+      "sudo_unavailable": "The SSH user cannot use the required sudo capability.",
+      "machine_id_unavailable": "The host machine ID could not be read.",
+      "read_only_target": "The host filesystem cannot accept the Pi Manager helper.",
+      "bootstrap_partial": "Bootstrap stopped partway through. Retry to repair the deterministic Pi Manager files."
+    },
+    "abort": {
+      "already_configured": "This remote machine is already configured.",
+      "cancelled": "Setup was cancelled.",
+      "setup_expired": "The setup preview expired.",
+      "not_found": "The config entry could not be found."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Pi Manager options",
+        "data": {
+          "poll_interval": "Polling interval (seconds)",
+          "filesystem_include": "Filesystem include list",
+          "filesystem_exclude": "Filesystem exclude list",
+          "network_include": "Network interface include list",
+          "network_exclude": "Network interface exclude list",
+          "monitored_services": "Monitored systemd services",
+          "enable_package_checks": "Enable package checks",
+          "package_check_cadence": "Package check cadence (seconds)",
+          "temperature_warning": "Temperature warning threshold (°C)",
+          "enable_dangerous_controls": "Enable package changes, service restarts, reboot, and shutdown controls"
+        }
+      }
+    },
+    "error": {
+      "service_invalid": "One or more service names are invalid.",
+      "service_not_allowlisted": "A service is not allowlisted.",
+      "service_unavailable": "A monitored service could not be validated on the host.",
+      "dangerous_controls_disabled": "Dangerous controls are disabled for this host.",
+      "update_already_running": "A package job is already running on this host.",
+      "package_job_failed": "The package job failed on this host.",
+      "package_job_start_failed": "The package job could not be started on this host.",
+      "package_preview_failed": "The package preview could not be completed on this host.",
+      "package_check_failed": "The package update check could not be completed on this host.",
+      "package_refresh_failed": "The package metadata refresh failed on this host.",
+      "package_holds_failed": "Held packages could not be inspected on this host.",
+      "failed_services_query_failed": "Failed systemd services could not be inspected on this host.",
+      "invalid_options": "The options are invalid."
+    }
+  },
+  "issues": {
+    "fingerprint_changed": {
+      "title": "Pi Manager SSH host key changed",
+      "description": "The stored host fingerprint for config entry {entry_id} no longer matches. Connections are blocked until the host is deliberately reconfigured."
+    },
+    "helper_incompatible": {
+      "title": "Pi Manager helper needs attention",
+      "description": "The helper contract on config entry {entry_id} is incompatible with this integration version."
+    }
+  }
+}

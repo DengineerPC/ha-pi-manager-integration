@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "agent_version": "0.2.0",
+  "machine": {
+    "machine_id": "0123456789abcdef0123456789abcdef",
+    "hostname": "pi-nas",
+    "model": "Raspberry Pi 5 Model B",
+    "os": "Debian GNU/Linux 13",
+    "kernel": "6.12.0-rpi",
+    "arch": "aarch64",
+    "uptime_seconds": 123456
+  },
+  "cpu": {
+    "usage_percent": 12.4,
+    "temperature_c": 48.2,
+    "load_1": 0.18,
+    "load_5": 0.21,
+    "load_15": 0.16
+  },
+  "memory": {
+    "total_bytes": 8589934592,
+    "used_bytes": 3123456789,
+    "used_percent": 36.4
+  },
+  "filesystems": [
+    {
+      "mount": "/",
+      "device": "/dev/mmcblk0p2",
+      "fstype": "ext4",
+      "total_bytes": 32000000000,
+      "used_bytes": 12000000000,
+      "used_percent": 37.5,
+      "readonly": false
+    },
+    {
+      "mount": "/mnt/extstorage",
+      "device": "/dev/sda1",
+      "fstype": "ext4",
+      "total_bytes": 1000000000000,
+      "used_bytes": 400000000000,
+      "used_percent": 40.0,
+      "readonly": false
+    }
+  ],
+  "network": [
+    {
+      "interface": "eth0",
+      "rx_bytes": 1000000,
+      "tx_bytes": 2000000,
+      "operstate": "up"
+    }
+  ],
+  "updates": {
+    "last_checked": "2026-09-07T10:00:00Z",
+    "available": 7,
+    "security": 2,
+    "reboot_required": false
+  },
+  "services": [
+    {
+      "name": "smbd.service",
+      "active": true,
+      "state": "active",
+      "substate": "running"
+    }
+  ],
+  "job": null
+}

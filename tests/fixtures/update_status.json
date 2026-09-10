@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "agent_version": "0.1.1",
+  "machine": {
+    "machine_id": "fedcba9876543210fedcba9876543210",
+    "hostname": "pi-office",
+    "model": "Generic Debian host",
+    "os": "Debian GNU/Linux 12",
+    "kernel": "6.1.0",
+    "arch": "x86_64",
+    "uptime_seconds": 42
+  },
+  "cpu": {
+    "usage_percent": 1.0,
+    "temperature_c": null,
+    "load_1": 0.01,
+    "load_5": 0.02,
+    "load_15": 0.03
+  },
+  "memory": {
+    "total_bytes": 4000000000,
+    "used_bytes": 1000000000,
+    "used_percent": 25.0
+  },
+  "filesystems": [],
+  "network": [],
+  "updates": {
+    "last_checked": null,
+    "available": 0,
+    "security": 0,
+    "reboot_required": true
+  },
+  "services": [],
+  "job": {
+    "id": "pm-20260907-123456-ab12",
+    "type": "apt_update",
+    "state": "running",
+    "started_at": "2026-09-07T12:34:56Z",
+    "finished_at": null,
+    "exit_code": null,
+    "summary": "Package update is running"
+  }
+}

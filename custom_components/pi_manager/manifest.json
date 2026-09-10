@@ -1,0 +1,12 @@
+{
+  "domain": "pi_manager",
+  "name": "Pi Manager",
+  "version": "0.2.0",
+  "documentation": "https://github.com/DengineerPC/ha-pi-manager-integration",
+  "issue_tracker": "https://github.com/DengineerPC/ha-pi-manager-integration/issues",
+  "codeowners": ["@DengineerPC"],
+  "config_flow": true,
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "requirements": ["asyncssh>=2.20.0"]
+}
