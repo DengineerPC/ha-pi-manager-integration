@@ -21,7 +21,7 @@ class FakeKeyStore:
 
 
 class FakeEntry:
-    data = {"key_id": "0123456789abcdef0123456789abcdef"}
+    data = {"key_id": "0123456789abcdef0123456789abcdef", "username": "denis"}
 
 
 class FakeRuntime:
@@ -50,8 +50,25 @@ async def test_older_helper_is_upgraded_once() -> None:
     result = await async_upgrade_if_needed(runtime, old)
     assert result.agent_version == HELPER_VERSION
     assert runtime.helper_upgrade_attempted is True
+    assert len(runtime.commands) == 2
     assert runtime.commands[0][0:3] == ["upgrade-helper", "--json", "--version"]
     assert "--signature" in runtime.commands[0]
+    assert "--sudoers" not in runtime.commands[0]
+    assert runtime.commands[1][0:3] == ["upgrade-helper", "--json", "--version"]
+    assert "--sudoers" in runtime.commands[1]
+
+
+@pytest.mark.asyncio
+async def test_current_helper_with_stale_policy_is_repaired_once() -> None:
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    stale = parse_status({**payload, "agent_version": HELPER_VERSION, "policy_version": "unknown"})
+    runtime = FakeRuntime(parse_status(payload))
+
+    result = await async_upgrade_if_needed(runtime, stale)
+
+    assert result.policy_version == HELPER_VERSION
+    assert len(runtime.commands) == 1
+    assert "--sudoers" in runtime.commands[0]
 
 
 @pytest.mark.asyncio

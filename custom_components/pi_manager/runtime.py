@@ -80,7 +80,7 @@ class PiManagerRuntime:
                 await self._drop_client()
                 raise
             if not result.ok:
-                error_code = _error_code(result.stdout)
+                error_code = _error_code(result.stdout, result.stderr)
                 if error_code:
                     raise HelperProtocolError(error_code)
                 raise HelperProtocolError("helper_command_failed")
@@ -213,11 +213,15 @@ class _NullAsyncLock:
         del exc_type, exc, traceback
 
 
-def _error_code(stdout: str) -> str | None:
+def _error_code(stdout: str, stderr: str = "") -> str | None:
     try:
         payload = json.loads(stdout)
     except json.JSONDecodeError:
-        return None
+        payload = None
     error = payload.get("error") if isinstance(payload, dict) else None
     code = error.get("code") if isinstance(error, dict) else None
-    return code if isinstance(code, str) else None
+    if isinstance(code, str):
+        return code
+    if any(line.strip() == "sudo: a password is required" for line in stderr.splitlines()):
+        return "helper_privilege_denied"
+    return None

@@ -34,19 +34,23 @@ except ImportError:  # pragma: no cover - only used on non-POSIX development hos
     _fcntl = None
 
 SCHEMA_VERSION = 1
-AGENT_VERSION = "0.2.4"
+AGENT_VERSION = "0.2.5"
 CONFIG_PATH = Path("/etc/pi-manager/config.json")
 TRUST_PATH = Path("/etc/pi-manager/trust.json")
 STATE_PATH = Path("/var/lib/pi-manager/state.json")
 UPDATE_LOCK_PATH = Path("/var/lib/pi-manager/update.lock")
 REMOTE_AGENT_PATH = "/usr/local/lib/pi-manager/pi_manager_agent.py"
 REMOTE_CTL_PATH = "/usr/local/sbin/pi-managerctl"
+REMOTE_SUDOERS_PATH = "/etc/sudoers.d/pi-manager"
 TAILSCALE_SERVICE = "tailscaled.service"
 MAX_JSON_BYTES = 256 * 1024
 MAX_COMMAND_OUTPUT = 256 * 1024
+MAX_SUDOERS_BYTES = 64 * 1024
 SERVICE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9@_.:-]*\.service$")
 PACKAGE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9@+_.:~-]{0,255}$")
 JOB_UNIT_RE = re.compile(r"^pi-manager-(?:update|job)-[a-f0-9]{32}$")
+SUDOERS_POLICY_VERSION_RE = re.compile(r"^# Pi Manager sudo policy version: (\d+\.\d+\.\d+)$")
+SUDOERS_USERNAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]{0,31}$")
 PSEUDO_FILESYSTEMS = {
     "autofs",
     "binfmt_misc",
@@ -70,6 +74,37 @@ PSEUDO_FILESYSTEMS = {
     "tmpfs",
     "tracefs",
 }
+
+# Keep this list in lockstep with the bundled sudoers template. It is repeated
+# here intentionally: the remote helper is deployed as a standalone file and
+# must validate a policy without importing Home Assistant code.
+SUDOERS_POLICY_COMMANDS: tuple[str, ...] = (
+    "/usr/local/sbin/pi-managerctl status --json",
+    "/usr/local/sbin/pi-managerctl check-updates --json",
+    "/usr/local/sbin/pi-managerctl update --json",
+    "/usr/local/sbin/pi-managerctl upgrade --json",
+    "/usr/local/sbin/pi-managerctl dist-upgrade --json",
+    "/usr/local/sbin/pi-managerctl preview-upgrade --json",
+    "/usr/local/sbin/pi-managerctl preview-dist-upgrade --json",
+    "/usr/local/sbin/pi-managerctl preview-autoremove --json",
+    "/usr/local/sbin/pi-managerctl audit-packages --json",
+    "/usr/local/sbin/pi-managerctl show-package-holds --json",
+    "/usr/local/sbin/pi-managerctl failed-services --json",
+    "/usr/local/sbin/pi-managerctl configure-packages --json",
+    "/usr/local/sbin/pi-managerctl repair-packages --json",
+    "/usr/local/sbin/pi-managerctl autoremove --json",
+    "/usr/local/sbin/pi-managerctl autoclean --json",
+    "/usr/local/sbin/pi-managerctl clean-cache --json",
+    "/usr/local/sbin/pi-managerctl reboot --json",
+    "/usr/local/sbin/pi-managerctl shutdown --json",
+    "/usr/local/sbin/pi-managerctl service-status *",
+    "/usr/local/sbin/pi-managerctl service-restart *",
+    "/usr/local/sbin/pi-managerctl service-validate *",
+    "/usr/local/sbin/pi-managerctl configure-services --json --services-json *",
+    "/usr/local/sbin/pi-managerctl configure-trust --json --secret *",
+    "/usr/local/sbin/pi-managerctl upgrade-helper --json --version * --agent * --ctl * --signature *",
+    "/usr/local/sbin/pi-managerctl upgrade-helper --json --version * --agent * --ctl * --signature * --sudoers *",
+)
 
 # These are deliberately fixed argument lists. Values from SSH, Home
 # Assistant, or a config file are never appended to an apt or dpkg command.
@@ -516,6 +551,48 @@ def _job_state(state: dict[str, Any]) -> dict[str, Any] | None:
     return job
 
 
+def _validate_sudoers_policy(content: str, version: str) -> None:
+    """Validate the complete Pi Manager policy before it can be activated."""
+
+    if not isinstance(content, str) or len(content.encode("utf-8")) > MAX_SUDOERS_BYTES:
+        raise AgentError("sudoers_policy_invalid")
+    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        raise AgentError("sudoers_policy_invalid")
+
+    expected_marker = f"# Pi Manager sudo policy version: {version}"
+    comments = [line.strip() for line in content.splitlines() if line.strip().startswith("#")]
+    if comments.count(expected_marker) != 1:
+        raise AgentError("sudoers_policy_invalid")
+
+    policy_lines = [line.strip() for line in content.splitlines() if line.strip() and not line.lstrip().startswith("#")]
+    if len(policy_lines) != 1:
+        raise AgentError("sudoers_policy_invalid")
+    policy_username, separator, command_text = policy_lines[0].partition(" ALL=(root) NOPASSWD: ")
+    if not separator or not SUDOERS_USERNAME_RE.fullmatch(policy_username):
+        raise AgentError("sudoers_policy_invalid")
+    if tuple(command_text.split(", ")) != SUDOERS_POLICY_COMMANDS:
+        raise AgentError("sudoers_policy_invalid")
+
+
+def _policy_version() -> str:
+    """Return the version of the current valid policy, or ``unknown``."""
+
+    content = _read_text(REMOTE_SUDOERS_PATH)
+    matches = [
+        match.group(1)
+        for line in content.splitlines()
+        if (match := SUDOERS_POLICY_VERSION_RE.fullmatch(line.strip())) is not None
+    ]
+    if len(matches) != 1:
+        return "unknown"
+    version = matches[0]
+    try:
+        _validate_sudoers_policy(content, version)
+    except AgentError:
+        return "unknown"
+    return version
+
+
 def _status() -> dict[str, Any]:
     config = _config()
     state = _read_json(STATE_PATH, {})
@@ -542,6 +619,7 @@ def _status() -> dict[str, Any]:
     updates["reboot_required"] = reboot_required
     return {
         "agent_version": AGENT_VERSION,
+        "policy_version": _policy_version(),
         "machine": _machine(),
         "cpu": cpu,
         "memory": _memory(),
@@ -927,7 +1005,85 @@ def _configure_trust(encoded_secret: str) -> dict[str, Any]:
     return {"configured": True}
 
 
-def _upgrade_helper(version: str, agent_encoded: str, ctl_encoded: str, signature: str) -> dict[str, Any]:
+def _decode_sudoers_policy(encoded: str, version: str) -> bytes:
+    try:
+        policy_source = base64.b64decode(encoded.encode("ascii"), validate=True)
+    except (ValueError, UnicodeError) as err:
+        raise AgentError("sudoers_policy_invalid") from err
+    if len(policy_source) > MAX_SUDOERS_BYTES:
+        raise AgentError("sudoers_policy_invalid")
+    try:
+        policy_text = policy_source.decode("utf-8")
+    except UnicodeDecodeError as err:
+        raise AgentError("sudoers_policy_invalid") from err
+    _validate_sudoers_policy(policy_text, version)
+    return policy_source
+
+
+def _set_root_ownership(path: Path) -> None:
+    chown = getattr(os, "chown", None)
+    if chown is None:
+        return
+    try:
+        chown(path, 0, 0)
+    except OSError as err:
+        raise AgentError("sudoers_write_failed") from err
+
+
+def _install_sudoers_policy(content: str, version: str) -> None:
+    """Validate with visudo, then atomically activate the owned policy file."""
+
+    effective_uid = getattr(os, "geteuid", None)
+    if effective_uid is not None and effective_uid() != 0:
+        raise AgentError("sudoers_policy_requires_root")
+    _validate_sudoers_policy(content, version)
+    target = Path(REMOTE_SUDOERS_PATH)
+    if target.is_symlink():
+        raise AgentError("sudoers_target_invalid")
+
+    temporary: Path | None = None
+    try:
+        target.parent.mkdir(mode=0o750, parents=True, exist_ok=True)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{target.name}.",
+            suffix=".upgrade",
+            dir=str(target.parent),
+        )
+        temporary = Path(temporary_name)
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(content.encode("utf-8"))
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, 0o440)
+        _set_root_ownership(temporary)
+        result = _run(["/usr/sbin/visudo", "-cf", str(temporary)], timeout=30)
+        if result.returncode != 0:
+            raise AgentError("sudoers_validation_failed")
+        if target.is_symlink():
+            raise AgentError("sudoers_target_invalid")
+        os.replace(temporary, target)
+        temporary = None
+        os.chmod(target, 0o440)
+        _set_root_ownership(target)
+    except AgentError:
+        raise
+    except OSError as err:
+        raise AgentError("sudoers_write_failed") from err
+    finally:
+        if temporary is not None:
+            try:
+                temporary.unlink()
+            except OSError:
+                pass
+
+
+def _upgrade_helper(
+    version: str,
+    agent_encoded: str,
+    ctl_encoded: str,
+    signature: str,
+    sudoers_encoded: str | None = None,
+) -> dict[str, Any]:
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise AgentError("helper_version_invalid")
     trust = _read_json(TRUST_PATH, {})
@@ -954,7 +1110,12 @@ def _upgrade_helper(version: str, agent_encoded: str, ctl_encoded: str, signatur
         compile(ctl_text, str(REMOTE_CTL_PATH), "exec")
     except SyntaxError as err:
         raise AgentError("helper_upgrade_invalid") from err
+    sudoers_source: bytes | None = None
+    if sudoers_encoded is not None:
+        sudoers_source = _decode_sudoers_policy(sudoers_encoded, version)
     message = version.encode("utf-8") + b"\0" + agent_source + b"\0" + ctl_source
+    if sudoers_source is not None:
+        message += b"\0" + sudoers_source
     expected = hmac.new(secret, message, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, signature):
         raise AgentError("helper_upgrade_signature_invalid")
@@ -976,7 +1137,15 @@ def _upgrade_helper(version: str, agent_encoded: str, ctl_encoded: str, signatur
             except OSError:
                 pass
         raise AgentError("helper_upgrade_write_failed") from err
-    return {"upgraded": True, "agent_version": version, "agent_sha256": hashlib.sha256(agent_source).hexdigest()}
+    result: dict[str, Any] = {
+        "upgraded": True,
+        "agent_version": version,
+        "agent_sha256": hashlib.sha256(agent_source).hexdigest(),
+    }
+    if sudoers_source is not None:
+        _install_sudoers_policy(sudoers_source.decode("utf-8"), version)
+        result["policy_version"] = version
+    return result
 
 
 def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
@@ -1021,6 +1190,7 @@ def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
     upgrade.add_argument("--agent", required=True)
     upgrade.add_argument("--ctl", required=True)
     upgrade.add_argument("--signature", required=True)
+    upgrade.add_argument("--sudoers")
     upgrade.add_argument("--json", action="store_true", required=True)
     return parser.parse_args(list(argv))
 
@@ -1089,7 +1259,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.operation == "configure-trust":
             return _emit(_configure_trust(args.secret))
         if args.operation == "upgrade-helper":
-            return _emit(_upgrade_helper(args.version, args.agent, args.ctl, args.signature))
+            return _emit(_upgrade_helper(args.version, args.agent, args.ctl, args.signature, args.sudoers))
         raise AgentError("operation_not_allowed")
     except AgentError as err:
         print(f"pi-manager: {err.code}", file=sys.stderr)

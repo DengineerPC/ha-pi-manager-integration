@@ -1,6 +1,6 @@
 # Pi Manager Installation
 
-This guide covers the public `0.2.5` HACS Integration release for Home
+This guide covers the public `0.2.6` HACS Integration release for Home
 Assistant `2026.5.0` or newer.
 
 ## Prerequisites
@@ -41,6 +41,13 @@ After confirmation, the integration:
 4. Validates the policy with `visudo -cf`.
 5. Verifies key-based `pi-managerctl status --json` access.
 6. Removes the bootstrap password from the Home Assistant config entry.
+
+When an existing host reports helper `0.2.4` or an unknown/stale
+`policy_version`, the integration automatically performs the signed migration
+to helper/policy `0.2.5`. It first uses the legacy helper-upgrade payload, then
+uses the newly installed helper to validate and atomically install the complete
+Pi Manager sudoers policy. This preserves the existing key, fingerprint,
+machine-ID device, and config entry; no password is requested again.
 
 The fingerprint is enforced on later connections. A changed fingerprint fails
 closed; do not accept it without independently verifying the host identity.
@@ -96,10 +103,10 @@ paths; never delete the entire `authorized_keys` file.
   repair/reconfigure path. Do not silently replace the trusted key.
 - **Missing Python/systemd/apt/sudo:** install the supported host prerequisites
   and retry. Pi Manager does not fall back to broad sudo or a shell.
-- **Helper contract needs attention:** keep the host reachable and let the
-  signed per-host helper upgrade retry. Do not replace the helper manually or
-  delete the config entry; the repair clears only after a schema-valid status
-  response from the corrected helper is confirmed.
+- **Helper or button policy needs attention:** keep the host reachable and let
+  the signed per-host helper/policy migration retry. Do not replace the helper
+  manually, add broad sudo access, or delete the config entry; the repair
+  clears only after schema-valid status reports helper and policy `0.2.5`.
 - **Architecture unsupported:** Raspberry Pi 1 normally reports `armv6l` and
   is accepted when the supported OS prerequisites are present.
 

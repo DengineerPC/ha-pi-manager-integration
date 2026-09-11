@@ -47,6 +47,41 @@ is not granted in sudoers and cannot be used as a normal remote management
 operation. There is no generic command, shell, apt-argument, systemd unit,
 package-name, or terminal mode.
 
+The restricted `/etc/sudoers.d/pi-manager` policy authorizes only these exact
+entry-point shapes (the helper still performs its own validation):
+
+```text
+/usr/local/sbin/pi-managerctl status --json
+/usr/local/sbin/pi-managerctl check-updates --json
+/usr/local/sbin/pi-managerctl update --json
+/usr/local/sbin/pi-managerctl upgrade --json
+/usr/local/sbin/pi-managerctl dist-upgrade --json
+/usr/local/sbin/pi-managerctl preview-upgrade --json
+/usr/local/sbin/pi-managerctl preview-dist-upgrade --json
+/usr/local/sbin/pi-managerctl preview-autoremove --json
+/usr/local/sbin/pi-managerctl audit-packages --json
+/usr/local/sbin/pi-managerctl show-package-holds --json
+/usr/local/sbin/pi-managerctl failed-services --json
+/usr/local/sbin/pi-managerctl configure-packages --json
+/usr/local/sbin/pi-managerctl repair-packages --json
+/usr/local/sbin/pi-managerctl autoremove --json
+/usr/local/sbin/pi-managerctl autoclean --json
+/usr/local/sbin/pi-managerctl clean-cache --json
+/usr/local/sbin/pi-managerctl reboot --json
+/usr/local/sbin/pi-managerctl shutdown --json
+/usr/local/sbin/pi-managerctl service-status NAME
+/usr/local/sbin/pi-managerctl service-restart NAME
+/usr/local/sbin/pi-managerctl service-validate NAME
+/usr/local/sbin/pi-managerctl configure-services --json --services-json VALUE
+/usr/local/sbin/pi-managerctl configure-trust --json --secret VALUE
+/usr/local/sbin/pi-managerctl upgrade-helper --json --version VALUE --agent VALUE --ctl VALUE --signature VALUE
+/usr/local/sbin/pi-managerctl upgrade-helper --json --version VALUE --agent VALUE --ctl VALUE --signature VALUE --sudoers VALUE
+```
+
+`NAME` and `VALUE` represent the single bounded argument accepted by the
+corresponding helper operation; they are not shell fragments. `job-worker` is
+deliberately absent from this list.
+
 ## Package operation mapping
 
 The following fixed operations are the complete package-management allowlist:
@@ -78,7 +113,8 @@ and never reboot automatically.
 ```json
 {
   "schema_version": 1,
-  "agent_version": "0.1.1",
+  "agent_version": "0.2.5",
+  "policy_version": "0.2.5",
   "machine": {
     "machine_id": "...",
     "hostname": "pi-nas",
@@ -140,7 +176,9 @@ preview operation. Each preview contains `operation`, `last_checked`,
 `dpkg_issues`, `apt_healthy`, and `summary`. `holds` contains
 `last_checked` and a bounded `packages` list. `failed_services` contains
 `last_checked` and a bounded `services` list. Older helpers may omit
-`maintenance`; clients treat the omission as empty optional state.
+`maintenance`; clients treat the omission as empty optional state. Older
+helpers may also omit `policy_version`; clients treat that as `"unknown"`,
+which causes the signed policy migration to be retried.
 
 `update --json` starts a serialized systemd-managed normal upgrade and returns
 a job identifier promptly. The other background operations use the same job
@@ -165,3 +203,35 @@ Rejected operations return a non-zero exit code and an object shaped like:
 Responses and command output are bounded. A breaking contract change requires
 incrementing `SCHEMA_VERSION`, preserving the old parser during migration, and
 updating this document and its fixtures in the same release.
+
+## Signed helper and policy migration
+
+The integration keeps the JSON schema at `1` while releasing helper `0.2.5`
+and integration `0.2.6`. An existing host is repaired without a bootstrap
+password, key rotation, machine-ID change, or host-fingerprint reset.
+
+For the first compatibility stage, the HMAC message is:
+
+```text
+version + NUL + agent_source + NUL + ctl_source
+```
+
+After that legacy-signed helper is installed, the new helper accepts the
+extended form for the policy migration:
+
+```text
+version + NUL + agent_source + NUL + ctl_source + NUL + sudoers_source
+```
+
+The candidate policy must contain the matching `# Pi Manager sudo policy
+version: 0.2.5` marker, a root-only `NOPASSWD` target, and exactly the command
+matrix above. The helper writes it beside the active file with mode `0440`,
+runs `/usr/sbin/visudo -cf` against the staged file, and atomically replaces
+only `/etc/sudoers.d/pi-manager` after validation. `status --json` reports the
+validated marker as `policy_version`; malformed or incomplete policies report
+`"unknown"` and are not considered repaired.
+
+If a non-JSON helper failure contains the exact `sudo: a password is required`
+condition, the Home Assistant runtime reports the bounded category
+`helper_privilege_denied`; it does not expose raw stderr. Other helper errors
+retain their JSON error code or use `helper_command_failed`.

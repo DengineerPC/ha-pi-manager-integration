@@ -10,37 +10,59 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .const import HELPER_VERSION
+from .const import CONF_USERNAME, HELPER_VERSION
 from .errors import HelperIncompatibleError, PiManagerError
 from .models import HostStatus
+from .sudoers import render_sudoers
 
 _VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 
 
 async def async_upgrade_if_needed(runtime: Any, status: HostStatus) -> HostStatus:
-    """Upgrade an older helper once, preserving identity, trust, and key."""
+    """Upgrade an older helper or stale policy once, preserving host identity."""
 
-    if _version_tuple(status.agent_version) >= _version_tuple(HELPER_VERSION):
+    helper_needs_upgrade = _version_tuple(status.agent_version) < _version_tuple(HELPER_VERSION)
+    policy_needs_upgrade = status.policy_version != HELPER_VERSION
+    if not helper_needs_upgrade and not policy_needs_upgrade:
         return status
     if runtime.helper_upgrade_attempted:
-        return status
+        raise HelperIncompatibleError("The helper policy migration has already been attempted")
     runtime.helper_upgrade_attempted = True
     try:
         material = await runtime.key_store.async_load_material(runtime.entry.data["key_id"])
         helper_dir = Path(__file__).parent / "remote"
-        agent_source, ctl_source = await asyncio.gather(
+        agent_source, ctl_source, sudoers_text = await asyncio.gather(
             asyncio.to_thread((helper_dir / "pi_manager_agent.py").read_bytes),
             asyncio.to_thread((helper_dir / "pi-managerctl").read_bytes),
+            asyncio.to_thread(
+                render_sudoers,
+                helper_dir / "sudoers.template",
+                runtime.entry.data[CONF_USERNAME],
+            ),
         )
-        signature_payload = HELPER_VERSION.encode("utf-8") + b"\0" + agent_source + b"\0" + ctl_source
+        sudoers_source = sudoers_text.encode("utf-8")
         secret = base64.b64decode(material.upgrade_secret.encode("ascii"), validate=True)
         if len(secret) != 32:
             raise ValueError("upgrade trust secret has an invalid length")
-        signature = hmac.new(
-            secret,
-            signature_payload,
-            hashlib.sha256,
-        ).hexdigest()
+        encoded_agent = base64.b64encode(agent_source).decode("ascii")
+        encoded_ctl = base64.b64encode(ctl_source).decode("ascii")
+        encoded_sudoers = base64.b64encode(sudoers_source).decode("ascii")
+        if helper_needs_upgrade:
+            await runtime.async_run_helper(
+                [
+                    "upgrade-helper",
+                    "--json",
+                    "--version",
+                    HELPER_VERSION,
+                    "--agent",
+                    encoded_agent,
+                    "--ctl",
+                    encoded_ctl,
+                    "--signature",
+                    _signature(secret, HELPER_VERSION, agent_source, ctl_source),
+                ],
+                serialized=True,
+            )
         await runtime.async_run_helper(
             [
                 "upgrade-helper",
@@ -48,22 +70,40 @@ async def async_upgrade_if_needed(runtime: Any, status: HostStatus) -> HostStatu
                 "--version",
                 HELPER_VERSION,
                 "--agent",
-                base64.b64encode(agent_source).decode("ascii"),
+                encoded_agent,
                 "--ctl",
-                base64.b64encode(ctl_source).decode("ascii"),
+                encoded_ctl,
                 "--signature",
-                signature,
+                _signature(secret, HELPER_VERSION, agent_source, ctl_source, sudoers_source),
+                "--sudoers",
+                encoded_sudoers,
             ],
             serialized=True,
         )
         refreshed = await runtime.async_status()
-        if _version_tuple(refreshed.agent_version) < _version_tuple(HELPER_VERSION):
-            raise HelperIncompatibleError("The helper did not report the upgraded version")
+        if (
+            _version_tuple(refreshed.agent_version) < _version_tuple(HELPER_VERSION)
+            or refreshed.policy_version != HELPER_VERSION
+        ):
+            raise HelperIncompatibleError("The helper did not report the upgraded policy")
         return refreshed
     except HelperIncompatibleError:
         raise
     except (OSError, PiManagerError, ValueError) as err:
         raise HelperIncompatibleError("The helper upgrade trust material is invalid") from err
+
+
+def _signature(
+    secret: bytes,
+    version: str,
+    agent_source: bytes,
+    ctl_source: bytes,
+    sudoers_source: bytes | None = None,
+) -> str:
+    payload = version.encode("utf-8") + b"\0" + agent_source + b"\0" + ctl_source
+    if sudoers_source is not None:
+        payload += b"\0" + sudoers_source
+    return hmac.new(secret, payload, hashlib.sha256).hexdigest()
 
 
 def _version_tuple(value: str) -> tuple[int, int, int]:

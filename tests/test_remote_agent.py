@@ -4,12 +4,18 @@ import base64
 import hashlib
 import hmac
 import json
+import stat
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
+from custom_components.pi_manager.const import HELPER_VERSION
 from custom_components.pi_manager.remote import pi_manager_agent as agent
+from custom_components.pi_manager.sudoers import render_sudoers
+
+SUDOERS_TEMPLATE = Path(__file__).parents[1] / "custom_components" / "pi_manager" / "remote" / "sudoers.template"
 
 
 def _patch_status_dependencies(monkeypatch, tmp_path, services: list[str] | None = None) -> None:
@@ -252,3 +258,154 @@ def test_helper_upgrade_requires_per_host_signature(tmp_path, monkeypatch) -> No
     assert result["upgraded"] is True
     with pytest.raises(agent.AgentError, match="signature_invalid"):
         agent._upgrade_helper("0.2.0", encoded_agent, encoded_ctl, "0" * 64)
+
+
+def test_upgrade_helper_accepts_optional_signed_sudoers_payload() -> None:
+    args = agent._parse_args(
+        [
+            "upgrade-helper",
+            "--json",
+            "--version",
+            HELPER_VERSION,
+            "--agent",
+            "agent",
+            "--ctl",
+            "ctl",
+            "--signature",
+            "signature",
+            "--sudoers",
+            "policy",
+        ]
+    )
+
+    assert args.sudoers == "policy"
+
+
+def test_helper_upgrade_installs_valid_signed_sudoers_policy(tmp_path, monkeypatch) -> None:
+    trust_path = tmp_path / "trust.json"
+    sudoers_path = tmp_path / "sudoers"
+    agent_path = tmp_path / "agent.py"
+    ctl_path = tmp_path / "ctl"
+    monkeypatch.setattr(agent, "TRUST_PATH", trust_path)
+    monkeypatch.setattr(agent, "REMOTE_SUDOERS_PATH", str(sudoers_path))
+    monkeypatch.setattr(agent, "REMOTE_AGENT_PATH", str(agent_path))
+    monkeypatch.setattr(agent, "REMOTE_CTL_PATH", str(ctl_path))
+
+    secret = b"x" * 32
+    encoded_secret = base64.b64encode(secret).decode()
+    assert agent._configure_trust(encoded_secret) == {"configured": True}
+    agent_source = f'AGENT_VERSION = "{HELPER_VERSION}"\n'.encode()
+    ctl_source = b"#!/usr/bin/python3\n"
+    sudoers_source = render_sudoers(SUDOERS_TEMPLATE, "denis").encode()
+    encoded_agent = base64.b64encode(agent_source).decode()
+    encoded_ctl = base64.b64encode(ctl_source).decode()
+    encoded_sudoers = base64.b64encode(sudoers_source).decode()
+    message = HELPER_VERSION.encode() + b"\0" + agent_source + b"\0" + ctl_source + b"\0" + sudoers_source
+    signature = hmac.new(secret, message, hashlib.sha256).hexdigest()
+
+    def fake_run(args, **kwargs):
+        del kwargs
+        assert list(args[:2]) == ["/usr/sbin/visudo", "-cf"]
+        temporary_policy = Path(args[2])
+        assert temporary_policy.parent == sudoers_path.parent
+        assert temporary_policy != sudoers_path
+        assert temporary_policy.read_bytes() == sudoers_source
+        return subprocess.CompletedProcess(list(args), 0, "", "")
+
+    monkeypatch.setattr(agent, "_run", fake_run)
+    result = agent._upgrade_helper(
+        HELPER_VERSION,
+        encoded_agent,
+        encoded_ctl,
+        signature,
+        encoded_sudoers,
+    )
+
+    assert result["upgraded"] is True
+    assert result["policy_version"] == HELPER_VERSION
+    assert sudoers_path.read_bytes() == sudoers_source
+    mode = stat.S_IMODE(sudoers_path.stat().st_mode)
+    assert mode == 0o440 if sys.platform != "win32" else mode & 0o222 == 0
+    assert agent_path.read_bytes() == agent_source
+    assert ctl_path.read_bytes() == ctl_source
+
+
+def test_invalid_sudoers_policy_is_rejected_before_helper_activation(tmp_path, monkeypatch) -> None:
+    trust_path = tmp_path / "trust.json"
+    agent_path = tmp_path / "agent.py"
+    ctl_path = tmp_path / "ctl"
+    sudoers_path = tmp_path / "sudoers"
+    monkeypatch.setattr(agent, "TRUST_PATH", trust_path)
+    monkeypatch.setattr(agent, "REMOTE_AGENT_PATH", str(agent_path))
+    monkeypatch.setattr(agent, "REMOTE_CTL_PATH", str(ctl_path))
+    monkeypatch.setattr(agent, "REMOTE_SUDOERS_PATH", str(sudoers_path))
+    secret = b"y" * 32
+    encoded_secret = base64.b64encode(secret).decode()
+    agent._configure_trust(encoded_secret)
+    agent_source = f'AGENT_VERSION = "{HELPER_VERSION}"\n'.encode()
+    ctl_source = b"#!/usr/bin/python3\n"
+    bad_policy = render_sudoers(SUDOERS_TEMPLATE, "denis").replace("ALL=(root)", "ALL=(ALL)").encode()
+    message = HELPER_VERSION.encode() + b"\0" + agent_source + b"\0" + ctl_source + b"\0" + bad_policy
+    signature = hmac.new(secret, message, hashlib.sha256).hexdigest()
+
+    with pytest.raises(agent.AgentError, match="sudoers_policy_invalid"):
+        agent._upgrade_helper(
+            HELPER_VERSION,
+            base64.b64encode(agent_source).decode(),
+            base64.b64encode(ctl_source).decode(),
+            signature,
+            base64.b64encode(bad_policy).decode(),
+        )
+
+    assert not agent_path.exists()
+    assert not ctl_path.exists()
+    assert not sudoers_path.exists()
+
+
+def test_failed_sudoers_validation_preserves_active_policy(tmp_path, monkeypatch) -> None:
+    trust_path = tmp_path / "trust.json"
+    sudoers_path = tmp_path / "sudoers"
+    agent_path = tmp_path / "agent.py"
+    ctl_path = tmp_path / "ctl"
+    old_policy = "existing policy\n"
+    sudoers_path.write_text(old_policy, encoding="utf-8")
+    monkeypatch.setattr(agent, "TRUST_PATH", trust_path)
+    monkeypatch.setattr(agent, "REMOTE_SUDOERS_PATH", str(sudoers_path))
+    monkeypatch.setattr(agent, "REMOTE_AGENT_PATH", str(agent_path))
+    monkeypatch.setattr(agent, "REMOTE_CTL_PATH", str(ctl_path))
+    secret = b"z" * 32
+    encoded_secret = base64.b64encode(secret).decode()
+    agent._configure_trust(encoded_secret)
+    agent_source = f'AGENT_VERSION = "{HELPER_VERSION}"\n'.encode()
+    ctl_source = b"#!/usr/bin/python3\n"
+    sudoers_source = render_sudoers(SUDOERS_TEMPLATE, "denis").encode()
+    message = HELPER_VERSION.encode() + b"\0" + agent_source + b"\0" + ctl_source + b"\0" + sudoers_source
+    signature = hmac.new(secret, message, hashlib.sha256).hexdigest()
+
+    def failed_visudo(args, **kwargs):
+        del kwargs
+        return subprocess.CompletedProcess(list(args), 1, "", "invalid")
+
+    monkeypatch.setattr(agent, "_run", failed_visudo)
+    with pytest.raises(agent.AgentError, match="sudoers_validation_failed"):
+        agent._upgrade_helper(
+            HELPER_VERSION,
+            base64.b64encode(agent_source).decode(),
+            base64.b64encode(ctl_source).decode(),
+            signature,
+            base64.b64encode(sudoers_source).decode(),
+        )
+
+    assert sudoers_path.read_text(encoding="utf-8") == old_policy
+
+
+def test_status_reports_current_validated_policy_version(monkeypatch, tmp_path) -> None:
+    _patch_status_dependencies(monkeypatch, tmp_path)
+    policy_path = tmp_path / "sudoers"
+    policy_path.write_text(render_sudoers(SUDOERS_TEMPLATE, "denis"), encoding="utf-8")
+    monkeypatch.setattr(agent, "REMOTE_SUDOERS_PATH", str(policy_path))
+    monkeypatch.setattr(agent, "_optional_service_status", lambda: None)
+
+    payload = agent._status()
+
+    assert payload["policy_version"] == HELPER_VERSION

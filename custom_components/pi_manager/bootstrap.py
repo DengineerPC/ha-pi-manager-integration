@@ -26,6 +26,7 @@ from .errors import BootstrapError, HostFingerprintMismatch
 from .key_store import KeyStore
 from .models import BootstrapResult, HostDiscovery
 from .ssh import SSHClientProtocol
+from .sudoers import render_sudoers
 from .validation import validate_service_list, validate_username
 
 ClientFactory = Callable[[str, int, str], SSHClientProtocol | Any]
@@ -245,10 +246,9 @@ class Bootstrapper:
 
     def _render_sudoers(self, username: str) -> str:
         try:
-            template = (self.helper_dir / "sudoers.template").read_text(encoding="utf-8")
-        except OSError as err:
+            return render_sudoers(self.helper_dir / "sudoers.template", username)
+        except (OSError, ValueError) as err:
             raise BootstrapError("sudoers_source", "The bundled sudoers policy is unavailable") from err
-        return template.replace("{username}", username)
 
 
 def _helper_version(path: Path) -> str:

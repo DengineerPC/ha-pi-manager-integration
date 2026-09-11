@@ -151,6 +151,7 @@ def parse_status(payload: Mapping[str, Any]) -> HostStatus:
         services=services,
         job=job,
         maintenance=maintenance,
+        policy_version=_string(payload.get("policy_version"), "policy_version", default="unknown"),
     )
 
 

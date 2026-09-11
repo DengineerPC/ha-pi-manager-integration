@@ -52,6 +52,22 @@ root-only and is not included in the normal sudoers allowlist. Preview, audit,
 hold, and failed-service queries expose bounded summaries rather than raw apt
 or systemd output.
 
+The policy is versioned independently from the JSON schema. A signed helper
+upgrade carries the exact rendered policy bytes in its HMAC message after the
+legacy helper payload has been accepted. The remote helper rejects missing,
+broadened, or malformed policies before activation, stages the file with root
+ownership and mode `0440`, validates the staged path with `visudo -cf`, and
+atomically replaces only `/etc/sudoers.d/pi-manager`. The complete policy
+contains explicit shapes for every monitoring, preview, audit, package-job,
+service, power, bootstrap, and helper-upgrade operation; it never grants
+`job-worker`, a shell, arbitrary apt/systemctl commands, or `NOPASSWD: ALL`.
+The reported `policy_version` is only current when that full validation passes.
+
+Hosts carrying an older helper or policy are repaired through the existing
+per-host HMAC trust record. A failed migration leaves the active sudoers file
+in place and can be retried on a later refresh; no bootstrap password, private
+key, machine identity, or host fingerprint is replaced.
+
 ## Diagnostics and frontend
 
 Diagnostics redact passwords, key references, fingerprints, private keys,

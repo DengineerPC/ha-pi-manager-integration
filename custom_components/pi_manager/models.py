@@ -133,6 +133,7 @@ class HostStatus:
     services: tuple[ServiceInfo, ...]
     job: JobInfo | None
     maintenance: MaintenanceInfo = MaintenanceInfo()
+    policy_version: str = "unknown"
 
 
 @dataclass(frozen=True, slots=True)

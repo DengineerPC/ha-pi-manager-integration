@@ -18,6 +18,7 @@ def test_parse_healthy_status() -> None:
     assert status.filesystems[1].mount == "/mnt/extstorage"
     assert status.updates.available == 7
     assert status.services[0].name == "smbd.service"
+    assert status.policy_version == "0.2.5"
 
 
 def test_parse_optional_maintenance_state() -> None:
@@ -61,6 +62,15 @@ def test_parse_old_status_defaults_optional_maintenance() -> None:
 
     assert status.maintenance.previews == ()
     assert status.maintenance.audit is None
+
+
+def test_parse_old_helper_defaults_missing_policy_version() -> None:
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    payload.pop("policy_version")
+
+    status = parse_status(payload)
+
+    assert status.policy_version == "unknown"
 
 
 def test_parse_json_rejects_malformed_response() -> None:

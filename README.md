@@ -7,7 +7,7 @@ This is the public HACS Integration repository:
 
 <https://github.com/DengineerPC/ha-pi-manager-integration>
 
-Pi Manager targets Home Assistant `2026.5.0` or newer. It has no YAML setup
+Pi Manager `0.2.6` targets Home Assistant `2026.5.0` or newer. It has no YAML setup
 requirement and does not require the optional dashboard package.
 
 [Open Pi Manager Integration in HACS](https://my.home-assistant.io/redirect/hacs_repository/?owner=DengineerPC&repository=ha-pi-manager-integration&category=integration)
@@ -114,8 +114,11 @@ accepting a changed host key. Helper upgrades preserve the host fingerprint,
 generated key, machine-ID device identity, and config-entry identity.
 
 If an upgrade reports an incompatible helper, keep the host reachable and
-resolve the repair issue through a deliberate reconfigure/upgrade retry. Do
-not replace the SSH key or delete the config entry as a routine upgrade step.
+resolve the repair issue through a deliberate reconfigure/upgrade retry. The
+integration migrates older hosts to helper/policy `0.2.5` through a signed
+two-stage upgrade and reports policy readiness only after exact sudoers
+validation. Do not replace the SSH key, add broad sudo access, or delete the
+config entry as a routine upgrade step.
 
 The automated and manual acceptance matrix is in
 [`ACCEPTANCE_TESTS.md`](ACCEPTANCE_TESTS.md). Source tests do not claim that

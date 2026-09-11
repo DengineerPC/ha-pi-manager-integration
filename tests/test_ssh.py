@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from custom_components.pi_manager import ssh
-from custom_components.pi_manager.errors import HostFingerprintMismatch
+from custom_components.pi_manager.errors import HostFingerprintMismatch, PiManagerConnectionError
 from custom_components.pi_manager.models import CommandResult
 from custom_components.pi_manager.ssh import AsyncSSHClient, _bounded, _verify_fingerprint
 
@@ -70,3 +70,21 @@ async def test_sudo_prompt_argument_is_non_empty() -> None:
 
     assert result.ok
     assert connection.command == "/usr/bin/sudo -S -p= -- /bin/true"
+
+
+@pytest.mark.asyncio
+async def test_asyncssh_channel_errors_become_reconnectable_connection_errors() -> None:
+    class FakeAsyncSSHError(Exception):
+        pass
+
+    class FakeConnection:
+        async def run(self, command: str, **kwargs: object) -> SimpleNamespace:
+            del command, kwargs
+            raise FakeAsyncSSHError("channel closed")
+
+    client = AsyncSSHClient("example.test", 22, "user")
+    client._asyncssh_module = SimpleNamespace(Error=FakeAsyncSSHError)
+    client._connection = FakeConnection()
+
+    with pytest.raises(PiManagerConnectionError, match="SSH command failed"):
+        await client.run(["/bin/true"])

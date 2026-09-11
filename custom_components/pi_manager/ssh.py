@@ -76,6 +76,7 @@ class AsyncSSHClient:
         self.username = username
         self.fingerprint: str | None = None
         self._connection: Any = None
+        self._asyncssh_module: Any = None
 
     async def connect(
         self,
@@ -88,6 +89,7 @@ class AsyncSSHClient:
         """Connect and require the callback to approve the observed host key."""
 
         asyncssh = await _async_import_asyncssh()
+        self._asyncssh_module = asyncssh
 
         owner = self
 
@@ -168,6 +170,11 @@ class AsyncSSHClient:
             )
         except (TimeoutError, OSError) as err:
             raise PiManagerConnectionError("SSH command failed") from err
+        except Exception as err:  # noqa: BLE001 - translate only known AsyncSSH transport failures
+            asyncssh_error = getattr(self._asyncssh_module, "Error", None)
+            if isinstance(asyncssh_error, type) and isinstance(err, asyncssh_error):
+                raise PiManagerConnectionError("SSH command failed") from err
+            raise
         return CommandResult(
             returncode=int(result.exit_status),
             stdout=_bounded(result.stdout or ""),
@@ -186,6 +193,11 @@ class AsyncSSHClient:
                 await sftp.chmod(path, mode)
         except (TimeoutError, OSError) as err:
             raise PiManagerConnectionError("SSH file transfer failed") from err
+        except Exception as err:  # noqa: BLE001 - translate only known AsyncSSH transport failures
+            asyncssh_error = getattr(self._asyncssh_module, "Error", None)
+            if isinstance(asyncssh_error, type) and isinstance(err, asyncssh_error):
+                raise PiManagerConnectionError("SSH file transfer failed") from err
+            raise
 
     async def close(self) -> None:
         if self._connection is not None:

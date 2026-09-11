@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
-  "agent_version": "0.2.4",
+  "agent_version": "0.2.5",
+  "policy_version": "0.2.5",
   "machine": {
     "machine_id": "0123456789abcdef0123456789abcdef",
     "hostname": "pi-nas",
