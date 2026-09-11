@@ -290,6 +290,8 @@ def test_helper_upgrade_installs_valid_signed_sudoers_policy(tmp_path, monkeypat
     monkeypatch.setattr(agent, "REMOTE_SUDOERS_PATH", str(sudoers_path))
     monkeypatch.setattr(agent, "REMOTE_AGENT_PATH", str(agent_path))
     monkeypatch.setattr(agent, "REMOTE_CTL_PATH", str(ctl_path))
+    monkeypatch.setattr(agent.os, "geteuid", lambda: 0, raising=False)
+    monkeypatch.setattr(agent, "_set_root_ownership", lambda path: None)
 
     secret = b"x" * 32
     encoded_secret = base64.b64encode(secret).decode()
@@ -373,6 +375,8 @@ def test_failed_sudoers_validation_preserves_active_policy(tmp_path, monkeypatch
     monkeypatch.setattr(agent, "REMOTE_SUDOERS_PATH", str(sudoers_path))
     monkeypatch.setattr(agent, "REMOTE_AGENT_PATH", str(agent_path))
     monkeypatch.setattr(agent, "REMOTE_CTL_PATH", str(ctl_path))
+    monkeypatch.setattr(agent.os, "geteuid", lambda: 0, raising=False)
+    monkeypatch.setattr(agent, "_set_root_ownership", lambda path: None)
     secret = b"z" * 32
     encoded_secret = base64.b64encode(secret).decode()
     agent._configure_trust(encoded_secret)
